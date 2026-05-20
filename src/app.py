@@ -2,7 +2,7 @@
 # Linear Regression Project
 #
 # Problem Statement:
-# 4Geeks Insurance S.L. wants to predict the health insurance
+# An insurance company wants to predict the health insurance
 # premium (charges) for each customer based on their data.
 # A team of doctors assembled a dataset from industry data
 # and a dedicated study. This is a regression problem.
