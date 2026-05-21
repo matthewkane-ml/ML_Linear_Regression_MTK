@@ -1,110 +1,85 @@
-# Plantilla de Proyecto de Ciencia de Datos
+# Regresión Lineal — Predicción de Primas de Seguro de Salud
 
-Esta plantilla está diseñada para impulsar proyectos de ciencia de datos proporcionando una configuración básica para conexiones de base de datos, procesamiento de datos, y desarrollo de modelos de aprendizaje automático. Incluye una organización estructurada de carpetas para tus conjuntos de datos y un conjunto de paquetes de Python predefinidos necesarios para la mayoría de las tareas de ciencia de datos.
+> Pipeline de regresión para predecir primas anuales de seguro a partir de datos demográficos de pacientes: EDA completo que revela el impacto desproporcionado del tabaquismo, ingeniería de características de interacción y un modelo de Regresión Lineal que alcanza R² ≈ 0,80.
 
-## Estructura
+---
 
-El proyecto está organizado de la siguiente manera:
+## Problema
 
-- **`src/app.py`** → Script principal de Python donde correrá tu proyecto.
-- **`src/explore.ipynb`** → Notebook para exploración y pruebas. Una vez finalizada la exploración, migra el código limpio a `app.py`.
-- **`src/utils.py`** → Funciones auxiliares, como conexión a bases de datos.
-- **`requirements.txt`** → Lista de paquetes de Python necesarios.
-- **`models/`** → Contendrá tus clases de modelos SQLAlchemy.
-- **`data/`** → Almacena los datasets en diferentes etapas:
-  - **`data/raw/`** → Datos sin procesar.
-  - **`data/interim/`** → Datos transformados temporalmente.
-  - **`data/processed/`** → Datos listos para análisis.
+Una compañía de seguros quiere predecir la prima anual de seguro de salud (`charges`) para cada cliente basándose en sus datos demográficos y de salud. Se utiliza un dataset ensamblado por un equipo de médicos a partir de datos del sector para entrenar el modelo. Este es un problema de regresión supervisada.
 
+## Dataset
 
-## ⚡ Configuración Inicial en Codespaces (Recomendado)
+- **Fuente:** Dataset Medical Insurance Cost (~1.338 filas)
+- **Target:** `charges` — prima anual de seguro en USD (continua)
+- **Características:**
 
-No es necesario realizar ninguna configuración manual, ya que **Codespaces se configura automáticamente** con los archivos predefinidos que ha creado la academia para ti. Simplemente sigue estos pasos:
+| Característica | Tipo | Descripción |
+|---|---|---|
+| age | Numérica | Edad del beneficiario principal |
+| sex | Categórica | Género del beneficiario principal |
+| bmi | Numérica | Índice de masa corporal |
+| children | Numérica | Número de dependientes |
+| smoker | Categórica | ¿Es fumador/a la persona? |
+| region | Categórica | Región residencial de EE.UU. (NE / SE / SW / NW) |
 
-1. **Espera a que el entorno se configure automáticamente**.
-   - Todos los paquetes necesarios y la base de datos se instalarán por sí mismos.
-   - El `username` y `db_name` creados automáticamente están en el archivo **`.env`** en la raíz del proyecto.
-2. **Una vez que Codespaces esté listo, puedes comenzar a trabajar inmediatamente**.
+## Pipeline de EDA y Preprocesamiento
 
+| Paso | Acción |
+|---|---|
+| Duplicados | 1 duplicado eliminado |
+| Nulos | Ninguno encontrado |
+| Manejo de outliers | BMI limitado al umbral superior del IQR (muy pocos valores extremos eliminados) |
+| Codificación | `sex` y `smoker` → pd.factorize(); `region` → one-hot (drop_first para evitar la trampa de variables ficticias) |
+| Característica de interacción | `bmi_smoker = bmi × smoker` — el análisis multivariante mostró que los fumadores con alto BMI forman un clúster diferenciado de altas primas |
+| Escalado | MinMaxScaler en todas las columnas de características |
+| Selección de características | SelectKBest (f_regression, k=7) — división antes de la selección para prevenir fuga de datos |
+| División | 80/20 entrenamiento/prueba |
 
-## 💻 Configuración en Local (Solo si no puedes usar Codespaces)
+**Hallazgo clave del EDA:** `smoker` es con diferencia la característica predictiva individual más importante. Los fumadores pagan primas dramáticamente más altas — la distribución de charges tiene un pronunciado pico secundario impulsado completamente por este grupo. El término de interacción `bmi_smoker` captura que este efecto se amplifica con un BMI alto.
 
-**Prerrequisitos**
+**Correlación con charges (aproximada):**
 
-Asegúrate de tener Python 3.11+ instalado en tu máquina. También necesitarás pip para instalar los paquetes de Python.
+| Característica | Señal |
+|---|---|
+| smoker | Muy fuerte |
+| age | Moderada positiva |
+| bmi | Moderada positiva (amplificada por la interacción con smoker) |
+| children | Débil positiva |
+| region | Negligible |
+| sex | Casi nula |
 
-**Instalación**
+## Resultados del Modelo
 
-Clona el repositorio del proyecto en tu máquina local.
+- **Modelo:** `sklearn.linear_model.LinearRegression`
+- **Puntuación R²:** ≈ **0,80** (80% de la varianza en las primas de seguro explicada)
+- **Nota:** La Regresión Lineal no tiene hiperparámetros que optimizar — la puntuación R² es la evaluación final.
 
-Navega hasta el directorio del proyecto e instala los paquetes de Python requeridos:
+## Conclusiones Clave
+
+- **Una característica domina:** El estado de fumador por sí solo representa la mayor parte de la varianza explicable. Cualquier modelo que no capture esta distinción fallará gravemente.
+- **Las características de interacción importan:** `bmi_smoker` es más predictivo que BMI solo porque la relación no es aditiva — un no fumador con BMI alto paga mucho menos que un fumador con BMI alto. Los modelos lineales necesitan que esto se ingenierie explícitamente; los modelos basados en árboles lo encontrarían automáticamente.
+- **R² ≈ 0,80 tiene un techo:** El 20% restante de la varianza probablemente proviene del historial de reclamaciones, condiciones preexistentes y factores de estilo de vida no capturados en estas 6 características — no es un fallo del modelo.
+
+## Stack Tecnológico
+
+`Python` · `scikit-learn` · `pandas` · `NumPy` · `Matplotlib` · `Seaborn`
+
+## Ejecutar Localmente
 
 ```bash
+git clone https://github.com/matthewkane-ml/ML_Linear_Regression_MTK.git
+cd ML_Linear_Regression_MTK
 pip install -r requirements.txt
-```
-
-**Crear una base de datos (si es necesario)**
-
-Crea una nueva base de datos dentro del motor Postgres personalizando y ejecutando el siguiente comando: 
-
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER mi_usuario WITH PASSWORD 'mi_contraseña'; 
-    CREATE DATABASE mi_base_de_datos OWNER mi_usuario; 
-END \$\$;"
-```
-Conéctate al motor Postgres para usar tu base de datos, manipular tablas y datos: 
-
-```bash
-$ psql -U mi_usuario -d mi_base_de_datos
-```
-
-¡Una vez que estés dentro de PSQL podrás crear tablas, hacer consultas, insertar, actualizar o eliminar datos y mucho más!
-
-**Variables de entorno**
-
-Crea un archivo .env en el directorio raíz del proyecto para almacenar tus variables de entorno, como tu cadena de conexión a la base de datos:
-
-```makefile
-DATABASE_URL="postgresql://<USUARIO>:<CONTRASEÑA>@<HOST>:<PUERTO>/<NOMBRE_BD>"
-
-#example
-DATABASE_URL="postgresql://mi_usuario:mi_contraseña@localhost:5432/mi_base_de_datos"
-```
-
-## Ejecutando la Aplicación
-
-Para ejecutar la aplicación, ejecuta el script app.py desde la raíz del directorio del proyecto:
-
-```bash
 python src/app.py
 ```
 
-## Añadiendo Modelos
+## Próximos Pasos
 
-Para añadir clases de modelos SQLAlchemy, crea nuevos archivos de script de Python dentro del directorio models/. Estas clases deben ser definidas de acuerdo a tu esquema de base de datos.
+- Probar **regresión Ridge o Lasso** para añadir regularización y comparar si penalizar los coeficientes débiles mejora la generalización
+- Ingenierizar una interacción **smoker × age** para probar si la penalización por tabaquismo crece con la edad
+- Comparar con un **Gradient Boosting Regressor** — los métodos basados en árboles encuentran relaciones no lineales e interacciones automáticamente, lo que probablemente empujaría el R² por encima de 0,85
 
-Definición del modelo de ejemplo (`models/example_model.py`):
+---
 
-```py
-from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-```
-
-## Trabajando con Datos
-
-Puedes colocar tus conjuntos de datos brutos en el directorio data/raw, conjuntos de datos intermedios en data/interim, y los conjuntos de datos procesados listos para el análisis en data/processed.
-
-Para procesar datos, puedes modificar el script app.py para incluir tus pasos de procesamiento de datos, utilizando pandas para la manipulación y análisis de datos.
-
-## Contribuyentes
-
-Este proyecto es mantenido por [matthewkane-ml](https://github.com/matthewkane-ml).
+**Autor:** Matthew Kane — [LinkedIn](https://www.linkedin.com/in/thomas-k-392094410/) · [Portafolio GitHub](https://github.com/matthewkane-ml)

@@ -1,110 +1,85 @@
-# Data Science Project Boilerplate
+# Linear Regression — Health Insurance Premium Prediction
 
-This boilerplate is designed to kickstart data science projects by providing a basic setup for database connections, data processing, and machine learning model development. It includes a structured folder organization for your datasets and a set of pre-defined Python packages necessary for most data science tasks.
+> Regression pipeline predicting annual insurance charges from patient demographics: full EDA revealing the outsized effect of smoking, interaction feature engineering, and a Linear Regression model achieving R² ≈ 0.80.
 
-## Structure
+---
 
-The project is organized as follows:
+## Problem
 
-- **`src/app.py`** → Main Python script where your project will run.
-- **`src/explore.ipynb`** → Notebook for exploration and testing. Once exploration is complete, migrate the clean code to `app.py`.
-- **`src/utils.py`** → Auxiliary functions, such as database connection.
-- **`requirements.txt`** → List of required Python packages.
-- **`models/`** → Will contain your SQLAlchemy model classes.
-- **`data/`** → Stores datasets at different stages:
-  - **`data/raw/`** → Raw data.
-  - **`data/interim/`** → Temporarily transformed data.
-  - **`data/processed/`** → Data ready for analysis.
+An insurance company wants to predict the annual health insurance premium (`charges`) for each customer based on their demographic and health data. A dataset assembled by a team of doctors from industry data is used to train the model. This is a supervised regression problem.
 
+## Dataset
 
-## ⚡ Initial Setup in Codespaces (Recommended)
+- **Source:** Medical Insurance Cost dataset (~1,338 rows)
+- **Target:** `charges` — annual insurance premium in USD (continuous)
+- **Features:**
 
-No manual setup is required, as **Codespaces is automatically configured** with the predefined files created by the academy for you. Just follow these steps:
+| Feature | Type | Description |
+|---|---|---|
+| age | Numerical | Age of the primary beneficiary |
+| sex | Categorical | Gender of the primary beneficiary |
+| bmi | Numerical | Body mass index |
+| children | Numerical | Number of dependents |
+| smoker | Categorical | Is the person a smoker? |
+| region | Categorical | U.S. residential region (NE / SE / SW / NW) |
 
-1. **Wait for the environment to configure automatically**.
-   - All necessary packages and the database will install themselves.
-   - The automatically created `username` and `db_name` are in the **`.env`** file at the root of the project.
-2. **Once Codespaces is ready, you can start working immediately**.
+## EDA & Preprocessing Pipeline
 
+| Step | Action |
+|---|---|
+| Duplicates | 1 duplicate removed |
+| Nulls | None found |
+| Outlier handling | BMI capped at IQR upper bound (very few extreme values removed) |
+| Encoding | `sex` and `smoker` → pd.factorize(); `region` → one-hot (drop_first to avoid dummy trap) |
+| Interaction feature | `bmi_smoker = bmi × smoker` — multivariate analysis showed high-BMI smokers form a distinct high-charges cluster |
+| Scaling | MinMaxScaler on all feature columns |
+| Feature selection | SelectKBest (f_regression, k=7) — split before selection to prevent data leakage |
+| Split | 80/20 train/test |
 
-## 💻 Local Setup (Only if you can't use Codespaces)
+**Key EDA finding:** `smoker` is by far the most predictive single feature. Smokers pay dramatically higher premiums — the charges distribution has a pronounced secondary peak driven entirely by this group. The interaction term `bmi_smoker` captures that this effect amplifies at high BMI.
 
-**Prerequisites**
+**Correlation with charges (approximate):**
 
-Make sure you have Python 3.11+ installed on your machine. You will also need pip to install the Python packages.
+| Feature | Signal |
+|---|---|
+| smoker | Very strong |
+| age | Moderate positive |
+| bmi | Moderate positive (amplified by smoker interaction) |
+| children | Weak positive |
+| region | Negligible |
+| sex | Near-zero |
 
-**Installation**
+## Model Results
 
-Clone the project repository to your local machine.
+- **Model:** `sklearn.linear_model.LinearRegression`
+- **R² score:** ≈ **0.80** (80% of variance in insurance charges explained)
+- **Note:** Linear Regression has no hyperparameters to tune — the R² score is the final evaluation.
 
-Navigate to the project directory and install the required Python packages:
+## Key Takeaways
+
+- **One feature dominates:** Smoker status alone accounts for the largest share of explainable variance. Any model that doesn't capture this distinction will fail badly.
+- **Interaction features matter:** `bmi_smoker` is more predictive than BMI alone because the relationship isn't additive — a high-BMI non-smoker pays much less than a high-BMI smoker. Linear models need this engineered explicitly; tree-based models would find it automatically.
+- **R² ≈ 0.80 has a ceiling:** The remaining 20% of variance likely comes from claim history, pre-existing conditions, and lifestyle factors not captured in these 6 features — not a modelling failure.
+
+## Tech Stack
+
+`Python` · `scikit-learn` · `pandas` · `NumPy` · `Matplotlib` · `Seaborn`
+
+## Run It Locally
 
 ```bash
+git clone https://github.com/matthewkane-ml/ML_Linear_Regression_MTK.git
+cd ML_Linear_Regression_MTK
 pip install -r requirements.txt
-```
-
-**Create a database (if necessary)**
-
-Create a new database within the Postgres engine by customizing and executing the following command:
-
-```bash
-$ psql -U postgres -c "DO \$\$ BEGIN 
-    CREATE USER my_user WITH PASSWORD 'my_password'; 
-    CREATE DATABASE my_database OWNER my_user; 
-END \$\$;"
-```
-Connect to the Postgres engine to use your database, manipulate tables, and data:
-
-```bash
-$ psql -U my_user -d my_database
-```
-
-Once inside PSQL, you can create tables, run queries, insert, update, or delete data, and much more!
-
-**Environment Variables**
-
-Create a .env file in the root directory of the project to store your environment variables, such as your database connection string:
-
-```makefile
-DATABASE_URL="postgresql://<USER>:<PASSWORD>@<HOST>:<PORT>/<DB_NAME>"
-
-#example
-DATABASE_URL="postgresql://my_user:my_password@localhost:5432/my_database"
-```
-
-## Running the Application
-
-To run the application, execute the app.py script from the root directory of the project:
-
-```bash
 python src/app.py
 ```
 
-## Adding Models
+## What I'd Do Next
 
-To add SQLAlchemy model classes, create new Python script files within the models/ directory. These classes should be defined according to your database schema.
+- Try **Ridge or Lasso regression** to add regularization and compare whether penalising weak coefficients improves generalisation
+- Engineer a **smoker × age** interaction to test whether the smoking penalty grows with age
+- Compare against a **Gradient Boosting Regressor** — tree-based methods find non-linear relationships and interactions automatically, which would likely push R² above 0.85
 
-Example model definition (`models/example_model.py`):
+---
 
-```py
-from sqlalchemy.orm import declarative_base
-from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
-
-Base = declarative_base()
-
-class ExampleModel(Base):
-    __tablename__ = 'example_table'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    username: Mapped[str] = mapped_column(unique=True)
-```
-
-## Working with Data
-
-You can place your raw datasets in the data/raw directory, intermediate datasets in data/interim, and processed datasets ready for analysis in data/processed.
-
-To process data, you can modify the app.py script to include your data processing steps, using pandas for data manipulation and analysis.
-
-## Contributors
-
-This project is maintained by [matthewkane-ml](https://github.com/matthewkane-ml).
+**Author:** Matthew Kane — [LinkedIn](https://www.linkedin.com/in/thomas-k-392094410/) · [GitHub portfolio](https://github.com/matthewkane-ml)
